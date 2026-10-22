@@ -1,0 +1,5 @@
+model,cv_roc_auc,cv_auc_std,cv_recall@0.5,best_params
+Logistic Regression,0.7417136734103676,0.012229332185005833,0.6577708006279435,{'C': 0.01}
+XGBoost,0.7311801179930403,0.014123716813093871,0.6750392464678179,"{'subsample': 0.7, 'n_estimators': 300, 'min_child_weight': 1, 'max_depth': 2, 'learning_rate': 0.02, 'colsample_bytree': 0.9}"
+Random Forest,0.723304264662392,0.01663671297229166,0.5478806907378336,"{'n_estimators': 300, 'min_samples_leaf': 5, 'max_features': 0.5, 'max_depth': 6}"
+Decision Tree,0.7099082039252554,0.016690361869004997,0.7456828885400314,"{'min_samples_leaf': 80, 'max_depth': 6}"
