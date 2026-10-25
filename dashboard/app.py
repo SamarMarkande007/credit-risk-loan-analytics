@@ -118,30 +118,32 @@ def load_model_summary() -> dict | None:
 # Sidebar filters
 # =============================================================================
 def sidebar_filters(apps: pd.DataFrame, custs: pd.DataFrame) -> dict:
+    """Empty selection = ALL.  Pick one or more values to narrow the dashboard."""
     types = sorted(apps["loan_type"].unique())
     states = sorted(custs["state"].unique())
     months = sorted(apps["month"].unique())
     full_range = (months[0], months[-1])
-    defaults = {"f_types": types, "f_states": states, "f_risk": list(CATEGORIES), "f_months": full_range}
-    for k in ("f_types", "f_states", "f_risk"):      # month slider gets its default via value= below
-        st.session_state.setdefault(k, defaults[k])
+    for k in ("f_types", "f_states", "f_risk"):
+        st.session_state.setdefault(k, [])            # nothing selected = everything shown
 
     def reset():
         for k in ("f_types", "f_states", "f_risk"):
-            st.session_state[k] = defaults[k]
-        st.session_state.pop("f_months", None)   # deleting the key puts the slider back to its default range
+            st.session_state[k] = []
+        st.session_state.pop("f_months", None)        # deleting the key puts the slider back to its default range
 
     st.sidebar.header("Filters")
-    st.sidebar.multiselect("Loan type", types, key="f_types")
-    st.sidebar.multiselect("Region (state)", states, key="f_states")
-    st.sidebar.multiselect("Risk category", list(CATEGORIES), key="f_risk")
+    st.sidebar.caption("Leave a filter empty to include everything.")
+    st.sidebar.multiselect("Loan type", types, key="f_types", placeholder="All loan types")
+    st.sidebar.multiselect("Region (state)", states, key="f_states", placeholder="All states")
+    st.sidebar.multiselect("Risk category", list(CATEGORIES), key="f_risk", placeholder="All risk categories")
     # value=(start, end) is what makes this a two-handle RANGE slider
     m0, m1 = st.sidebar.select_slider("Application month", options=months, value=full_range, key="f_months")
     st.sidebar.button("Reset filters", on_click=reset)
 
-    return {"types": st.session_state["f_types"], "states": st.session_state["f_states"],
-            "risk": st.session_state["f_risk"], "m0": m0, "m1": m1,
-            "all_types": types, "all_months": full_range}
+    return {"types": st.session_state["f_types"] or types,        # empty -> all
+            "states": st.session_state["f_states"] or states,
+            "risk": st.session_state["f_risk"] or list(CATEGORIES),
+            "m0": m0, "m1": m1, "all_types": types, "all_months": full_range}
 
 
 def apply_filters(apps: pd.DataFrame, custs: pd.DataFrame, f: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -392,13 +394,13 @@ def tab_geography(a: pd.DataFrame, c: pd.DataFrame) -> None:
 
 def tab_watchlist(c: pd.DataFrame, f: dict) -> None:
     col1, col2, col3 = st.columns([1.2, 2, 1])
-    risk_pick = col1.multiselect("Risk category", list(CATEGORIES), default=["High"], key="wl_risk")
+    risk_pick = col1.multiselect("Risk category", list(CATEGORIES), key="wl_risk", placeholder="All categories")
     state_opts = sorted(c["state"].unique())
-    state_pick = col2.multiselect("Region (state)", state_opts, default=state_opts, key="wl_states")
+    state_pick = col2.multiselect("Region (state)", state_opts, key="wl_states", placeholder="All states")
     top_n = col3.number_input("Rows to show", min_value=10, max_value=1000, value=50, step=10, key="wl_n")
 
-    w = c[c["risk_category"].isin(risk_pick) & c["state"].isin(state_pick)].sort_values(
-        ["risk_score", "default_probability"], ascending=False)
+    w = c[c["risk_category"].isin(risk_pick or list(CATEGORIES)) & c["state"].isin(state_pick or state_opts)]
+    w = w.sort_values(["risk_score", "default_probability"], ascending=False)
     st.markdown(f"**{len(w):,} customers** match. Showing the {min(int(top_n), len(w)):,} highest scores.")
     if w.empty:
         st.info("No customers match these filters.")
@@ -470,9 +472,9 @@ def main() -> None:
             "- Customer charts follow the state and risk filters. Choosing a loan type or month range keeps only "
             "customers with a matching application.")
 
-    if a.empty or any(len(f[k]) == 0 for k in ("types", "states", "risk")):
-        st.warning("No applications match the current filters. Widen the filters or press **Reset filters**.")
-        st.stop()
+        if a.empty:
+            st.warning("No applications match this combination of filters. Remove a filter or press **Reset filters**.")
+        
 
     k = kpis(a, c)
     cols = st.columns(5)
